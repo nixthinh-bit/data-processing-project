@@ -1,0 +1,54 @@
+10:45:01  === Lần chạy 2026-10-27_run03 lúc 2026-10-27 10:45:01 ===
+10:45:01  phiên bản script (git): chưa có git
+10:45:01  reference: {'data_dictionary.md': 'f0ab152beeeede45', 'validation_rules.md': '112829b24e530d44'}
+10:45:01  ghi chú: Q4.2026 bản gửi lại, đã sửa KH0031
+10:45:01  chỉ đọc file khớp: tai_ky_Q4.2026_v2_*.xlsx
+10:45:01  raw: đặt chỉ đọc cho tai_ky_Q4.2026_v2_2026-10-28.xlsx
+10:45:01  raw: tai_ky_Q4.2026_v2_2026-10-28.xlsx  sha256 dd1b722c2fdd840a...  12,687 byte
+10:45:01  --- clean ---
+10:45:02  clean: tai_ky_Q4.2026_v2_2026-10-28.xlsx có 103 dòng, 13 cột khớp
+10:45:02  clean: tách trùng theo ['ma_kh']: 1 nhóm trùng, loại 1 dòng
+10:45:02  clean: giữ 72 dòng, loại 31 dòng (lý do ở 01_excluded.csv)
+10:45:02  clean:   25 dòng: quoc_gia ngoài phạm vi lọc ['VN']
+10:45:02  clean:   1 dòng: arr_2025: '$5,040' mơ hồ: có thể là số thập phân hoặc số có dấu hàng nghìn kiểu khác
+10:45:02  clean:   1 dòng: chiet_khau: '15' không rõ là 15% hay 1500%, cần ghi dạng 0.15 hoặc 15%
+10:45:02  clean:   1 dòng: ngay_het_han: '31/02/2026' không khớp định dạng ngày ['%d/%m/%Y', '%Y-%m-%d']
+10:45:02  clean:   1 dòng: ma_kh: bắt buộc nhưng trống
+10:45:02  clean:   1 dòng: dòng trống
+10:45:02  clean:   1 dòng: trùng ma_kh, giống hệt dòng được giữ
+10:45:02  --- transform ---
+10:45:02  transform: tinh_chenh_lech_arr thêm cột ['chenh_lech_arr']
+10:45:02  transform: xep_theo_partner
+10:45:02  transform: 72 dòng vào, 72 dòng ra
+10:45:02  --- Tầng 1: Cấu trúc ---
+10:45:02  [CHẶN] ✓ File gốc không bị sửa trong lúc chạy
+10:45:02  [CHẶN] ✓ Đủ cột theo data_dictionary
+10:45:02  [CHẶN] ✓ Không có cột chưa khai báo
+10:45:02  [CHẶN] ✓ Đúng kiểu dữ liệu
+10:45:02  [CHẶN] ✓ Không trùng khoá ['ma_kh']
+10:45:02  [CHẶN] ✓ Ô trống dưới ngưỡng (mặc định 5%)
+10:45:02  --- Tầng 2: Đối soát ---
+10:45:02  [CHẶN] ✓ Số dòng: vào 103 = ra 72 + loại 31
+10:45:02  [CHẶN] ✓ Mỗi dòng gốc có mặt đúng một lần ở kết quả hoặc danh sách loại
+10:45:02  [CHẶN] ✓ Tổng arr_2025: vào 1,741,080.00 = ra 598,680.00 + loại 1,142,400.00; 2 ô gốc không đọc được thành số, đều nằm trong danh sách loại
+10:45:02  [CHẶN] ✓ Tổng arr_2026: vào 494,323.00 = ra 289,699.00 + loại 204,624.00
+10:45:02  --- Tầng 3: Nghiệp vụ ---
+10:45:02  [CẢNH BÁO] ✓ quoc_gia thuộc danh sách hợp lệ
+10:45:02  [CẢNH BÁO] ⚠ so_license trong khoảng [1, ...]: 1 dòng ngoài khoảng, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:18 (-50)
+10:45:02  [CẢNH BÁO] ✓ arr_2025 trong khoảng [0, ...]
+10:45:02  [CẢNH BÁO] ✓ arr_2026 trong khoảng [0, ...]
+10:45:02  [CẢNH BÁO] ✓ chiet_khau trong khoảng [0, 0.3]
+10:45:02  [CẢNH BÁO] ⚠ trang_thai thuộc danh sách hợp lệ: 1 dòng lạ, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:14 (da tai ky)
+10:45:02  [CẢNH BÁO] ⚠ ngay_bat_dau không sau ngay_het_han: 1 dòng sai, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:13 (2024-01-01)
+10:45:02  [CẢNH BÁO] ⚠ Churn thì ARR 2026 bằng 0: 1 dòng sai, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:15 (3000.0)
+10:45:02  [CẢNH BÁO] ⚠ Churn và Downsell phải có lý do: 1 dòng sai, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:16 (Downsell)
+10:45:02  [CẢNH BÁO] ✓ Upsell thì ARR 2026 lớn hơn ARR 2025
+10:45:02  [CẢNH BÁO] ⚠ Downsell thì ARR 2026 nhỏ hơn ARR 2025 và lớn hơn 0: 1 dòng sai, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:16 (0.0)
+10:45:02  [CẢNH BÁO] ✓ Đã chốt (tái ký, upsell, downsell) thì phải có ARR 2026
+10:45:02  [CẢNH BÁO] ✓ ngay_bat_dau không nằm ở tương lai
+10:45:02  --- Tầng 4: Biến động ---
+10:45:02  [CẢNH BÁO] ✓ Chưa có lần chạy đạt trước đó để so sánh
+10:45:02  --- Tầng 5: Người đối chiếu ---
+10:45:02  [THỦ CÔNG] ☐ Mở file gốc, đối chiếu 8 dòng trong 2026-10-27_run03/mau_doi_chieu.csv, điền cột khop_file_goc (co/khong)
+10:45:02  === Kết luận ===
+10:45:02  Đã xuất 2026-10-27_run03/ket_qua.xlsx (72 dòng). Cảnh báo: 6. Còn chờ đối chiếu tay (tầng 5).

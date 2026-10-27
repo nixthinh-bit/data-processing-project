@@ -1,0 +1,13 @@
+# Dữ liệu và kết quả không lên git (thường là dữ liệu công ty)
+data/raw/*
+data/processed/*
+outputs/*
+logs/run_log/*
+!**/.gitkeep
+
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+~$*
+

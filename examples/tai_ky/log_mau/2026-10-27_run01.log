@@ -1,0 +1,10 @@
+10:44:25  === Lần chạy 2026-10-27_run01 lúc 2026-10-27 10:44:25 ===
+10:44:25  phiên bản script (git): chưa có git
+10:44:25  reference: {'data_dictionary.md': '27ea2cbba8af1db2', 'validation_rules.md': '112829b24e530d44'}
+10:44:25  ghi chú: Q4.2026 bản đầu
+10:44:25  raw: đặt chỉ đọc cho tai_ky_Q4.2026_2026-10-27.xlsx
+10:44:25  raw: tai_ky_Q4.2026_2026-10-27.xlsx  sha256 6889926ed7db8501...  12,931 byte
+10:44:25  --- clean ---
+10:44:26  [CHẶN] ✗ tai_ky_Q4.2026_2026-10-27.xlsx: có cột chưa có trong data_dictionary: ['Ghi chú KAM']. Không đoán nghĩa, hỏi người dùng.
+10:44:26  === Kết luận ===
+10:44:26  CHƯA XONG: 1 lỗi mức CHẶN. Không xuất file kết quả.

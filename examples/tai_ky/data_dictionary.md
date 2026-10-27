@@ -1,116 +1,124 @@
-# Data dictionary: danh sách tái ký (giả lập)
+# Data dictionary: customer renewals (simulated)
 
-Cấu hình cho bộ dữ liệu `examples/tai_ky/`. Muốn dùng thì chép file này đè lên
-`.claude/skills/data-processing/reference/data_dictionary.md`. Cách khai báo từng khoá xem ở file gốc đó.
+[Tiếng Việt](data_dictionary.vi.md)
+
+Configuration for the `examples/tai_ky/` sample. To use it, copy this file over
+`.claude/skills/data-processing/reference/data_dictionary.md`. Key meanings are explained in that file.
+The source headers are in Vietnamese because the simulated CRM export is Vietnamese.
 
 ```yaml
-cot:
+columns:
   ma_kh:
-    ten_goc: ["Mã KH"]
-    kieu: string
-    nghia: Mã khách hàng trong CRM, mỗi khách một dòng
-    bat_buoc: true
-    khoa: true
-    trang_thai: xac_nhan
+    source_names: ["Mã KH"]
+    type: string
+    meaning: Customer ID in the CRM, one row per customer
+    required: true
+    key: true
+    status: confirmed
 
   ten_khach_hang:
-    ten_goc: ["Tên khách hàng"]
-    kieu: string
-    bat_buoc: true
-    trang_thai: xac_nhan
+    source_names: ["Tên khách hàng"]
+    type: string
+    meaning: Customer name
+    required: true
+    status: confirmed
 
   partner:
-    ten_goc: ["Partner"]
-    kieu: string
-    nghia: Partner quản lý khách. Trống là khách chưa gắn partner
-    ty_le_trong_toi_da: 1.0
-    trang_thai: xac_nhan
+    source_names: ["Partner"]
+    type: string
+    meaning: Partner managing the customer. Blank means no partner yet
+    max_blank_ratio: 1.0
+    status: confirmed
 
   csm:
-    ten_goc: ["CSM"]
-    kieu: string
-    nghia: CSM phụ trách
-    trang_thai: xac_nhan
+    source_names: ["CSM"]
+    type: string
+    meaning: Customer success manager in charge
+    status: confirmed
 
   quoc_gia:
-    ten_goc: ["Quốc gia"]
-    kieu: string
-    nghia: Quốc gia của khách, chuẩn hoá về mã 2 chữ
-    bat_buoc: true
-    anh_xa: {"Việt Nam": VN, "Vietnam": VN, "vn": VN}
-    gia_tri_hop_le: [VN]
-    trang_thai: xac_nhan
+    source_names: ["Quốc gia"]
+    type: string
+    meaning: Customer country, normalised to a 2-letter code
+    required: true
+    map: {"Việt Nam": VN, "Vietnam": VN, "vn": VN}
+    allowed_values: [VN]
+    status: confirmed
 
   ngay_bat_dau:
-    ten_goc: ["Ngày bắt đầu HĐ"]
-    kieu: date
-    bat_buoc: true
-    trang_thai: xac_nhan
+    source_names: ["Ngày bắt đầu HĐ"]
+    type: date
+    meaning: Contract start date
+    required: true
+    status: confirmed
 
   ngay_het_han:
-    ten_goc: ["Ngày hết hạn HĐ"]
-    kieu: date
-    nghia: Ngày hết hạn hợp đồng hiện tại, là mốc tái ký
-    bat_buoc: true
-    trang_thai: xac_nhan
+    source_names: ["Ngày hết hạn HĐ"]
+    type: date
+    meaning: End date of the current contract, the renewal date
+    required: true
+    status: confirmed
 
   so_license:
-    ten_goc: ["Số license"]
-    kieu: int
-    bat_buoc: true
+    source_names: ["Số license"]
+    type: int
+    meaning: Number of licenses
+    required: true
     min: 1
-    trang_thai: xac_nhan
+    status: confirmed
 
   arr_2025:
-    ten_goc: ["ARR 2025 (USD)"]
-    kieu: tien
-    don_vi: USD
-    nghia: Doanh thu định kỳ năm của hợp đồng hiện tại
-    bat_buoc: true
-    khong_am: true
-    trang_thai: xac_nhan
+    source_names: ["ARR 2025 (USD)"]
+    type: money
+    unit: USD
+    meaning: Annual recurring revenue of the current contract
+    required: true
+    non_negative: true
+    status: confirmed
 
   arr_2026:
-    ten_goc: ["ARR 2026 (USD)"]
-    kieu: tien
-    don_vi: USD
-    nghia: ARR sau tái ký. Trống khi đang đàm phán, bằng 0 khi churn
-    khong_am: true
-    ty_le_trong_toi_da: 0.4
-    trang_thai: xac_nhan
+    source_names: ["ARR 2026 (USD)"]
+    type: money
+    unit: USD
+    meaning: ARR after renewal. Blank while negotiating, 0 on churn
+    non_negative: true
+    max_blank_ratio: 0.4
+    status: confirmed
 
   chiet_khau:
-    ten_goc: ["Chiết khấu"]
-    kieu: phan_tram
-    nghia: Chiết khấu khi tái ký, lưu dạng 0..1
+    source_names: ["Chiết khấu"]
+    type: percent
+    meaning: Renewal discount, stored as 0..1
     min: 0
     max: 0.3
-    trang_thai: xac_nhan
+    status: confirmed
 
   trang_thai:
-    ten_goc: ["Trạng thái"]
-    kieu: string
-    bat_buoc: true
-    gia_tri_hop_le: ["Đã tái ký", "Đang đàm phán", "Upsell", "Downsell", "Churn"]
-    trang_thai: xac_nhan
+    source_names: ["Trạng thái"]
+    type: string
+    meaning: Renewal status
+    required: true
+    allowed_values: ["Đã tái ký", "Đang đàm phán", "Upsell", "Downsell", "Churn"]
+    status: confirmed
 
   ly_do:
-    ten_goc: ["Lý do churn/downsell"]
-    kieu: string
-    ty_le_trong_toi_da: 1.0
-    trang_thai: xac_nhan
+    source_names: ["Lý do churn/downsell"]
+    type: string
+    meaning: Reason for churn or downsell
+    max_blank_ratio: 1.0
+    status: confirmed
 
   ghi_chu_kam:
-    ten_goc: ["Ghi chú KAM"]
-    bo_qua: true
-    nghia: Ghi chú tự do của KAM, không dùng cho báo cáo (người dùng xác nhận 2026-10-27)
+    source_names: ["Ghi chú KAM"]
+    skip: true
+    meaning: Free-text KAM note, not used for reporting (confirmed by the user 2026-10-27)
 
-  # Cột do transform.py tạo
+  # Columns created by transform.py
   chenh_lech_arr:
-    nguon: tinh_toan
-    kieu: float
-    don_vi: USD
-    nghia: arr_2026 trừ arr_2025, trống khi chưa có ARR 2026
-    ty_le_trong_toi_da: 0.4
-    trang_thai: xac_nhan
+    source: computed
+    type: float
+    unit: USD
+    meaning: arr_2026 minus arr_2025, blank while ARR 2026 is unknown
+    max_blank_ratio: 0.4
+    status: confirmed
 ```

@@ -1,7 +1,10 @@
-"""Hàm dùng chung cho các script: đường dẫn, đọc cấu hình từ file .md, ghi run log, ép kiểu.
+"""Hàm dùng chung cho các script: đường dẫn, đọc cấu hình từ file .md, ngôn ngữ, ghi run log, ép kiểu.
+
+Shared helpers: paths, config loading from .md files, language, run log, type parsing.
 
 Cấu hình (data_dictionary, validation_rules) nằm trong các khối ```yaml của file Markdown
-ở thư mục reference/, để người không đọc code vẫn sửa được.
+ở thư mục reference/, để người không đọc code vẫn sửa được. Tên khoá viết bằng tiếng Việt hoặc
+tiếng Anh đều được (xem messages.KEY_ALIASES); bên trong code dùng tên tiếng Việt.
 """
 import datetime as dt
 import hashlib
@@ -13,6 +16,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+import messages as m
+
 SKILL_DIR = Path(__file__).resolve().parent.parent
 ROOT = SKILL_DIR.parents[2]
 REF_DIR = SKILL_DIR / "reference"
@@ -21,36 +26,87 @@ PROCESSED_DIR = ROOT / "data" / "processed"
 OUTPUTS_DIR = ROOT / "outputs"
 RUN_LOG_DIR = ROOT / "logs" / "run_log"
 
-CHAN = "CHẶN"
-CANH_BAO = "CẢNH BÁO"
-THU_CONG = "THỦ CÔNG"
+# Mã mức kiểm tra (nội bộ). Nhãn hiển thị theo ngôn ngữ lấy bằng label().
+CHAN = "CHAN"
+CANH_BAO = "CANH_BAO"
+THU_CONG = "THU_CONG"
 
-# Cột kỹ thuật do clean.py thêm vào để truy vết từng dòng về file và dòng Excel gốc.
-SOURCE_FILE = "_file_goc"
-SOURCE_ROW = "_dong_goc"
-TRACE_COLS = [SOURCE_FILE, SOURCE_ROW]
+LANG = "vi"
+
+
+def t(key, **kw):
+    """Thông điệp theo ngôn ngữ đang chọn."""
+    vi, en = m.MESSAGES[key]
+    return (en if LANG == "en" else vi).format(**kw)
+
+
+def label(level):
+    return t(level)
+
+
+def set_language(lang):
+    """Đặt ngôn ngữ cho log, lý do loại, tên cột truy vết và tên file kết quả."""
+    global LANG, SOURCE_FILE, SOURCE_ROW, TRACE_COLS, REASON, DUP_OF, RESULT_FILE, SAMPLE_FILE, SAMPLE_MATCH, SAMPLE_NOTE
+    LANG = "en" if str(lang).lower().startswith("en") else "vi"
+    i = 1 if LANG == "en" else 0
+    names = {k: v[i] for k, v in m.NAMES.items()}
+    SOURCE_FILE, SOURCE_ROW = names["SOURCE_FILE"], names["SOURCE_ROW"]
+    TRACE_COLS = [SOURCE_FILE, SOURCE_ROW]
+    REASON, DUP_OF = names["REASON"], names["DUP_OF"]
+    RESULT_FILE, SAMPLE_FILE = names["RESULT_FILE"], names["SAMPLE_FILE"]
+    SAMPLE_MATCH, SAMPLE_NOTE = names["SAMPLE_MATCH"], names["SAMPLE_NOTE"]
+
+
+# Cột kỹ thuật do clean.py thêm vào để truy vết từng dòng về file và dòng Excel gốc,
+# cùng các tên file, tên cột khác phụ thuộc ngôn ngữ. Giá trị đặt trong set_language().
+SOURCE_FILE = SOURCE_ROW = REASON = DUP_OF = RESULT_FILE = SAMPLE_FILE = SAMPLE_MATCH = SAMPLE_NOTE = None
+TRACE_COLS = []
+set_language("vi")
 
 
 # ---------- cấu hình ----------
 
 def load_yaml_blocks(md_path):
-    """Gộp mọi khối ```yaml trong một file Markdown thành một dict."""
+    """Gộp mọi khối ```yaml trong một file Markdown thành một dict, đã đổi khoá tiếng Anh về tên nội bộ."""
     text = Path(md_path).read_text(encoding="utf-8")
     data = {}
     for block in re.findall(r"```ya?ml\s*\n(.*?)```", text, re.S):
         loaded = yaml.safe_load(block) or {}
-        data.update(loaded)
+        data.update(_normalize_keys(loaded))
     return data
+
+
+def _normalize_keys(obj):
+    """Đổi khoá cấu hình tiếng Anh về tên nội bộ. Không đụng tới tên cột hay giá trị của người dùng."""
+    if isinstance(obj, list):
+        return [_normalize_keys(x) for x in obj]
+    if not isinstance(obj, dict):
+        return obj
+    out = {}
+    for k, v in obj.items():
+        key = m.KEY_ALIASES.get(k, k) if isinstance(k, str) else k
+        if key == "cot" and isinstance(v, dict):
+            v = {col: _normalize_keys(spec) for col, spec in v.items()}  # tên cột giữ nguyên
+        elif key in m.USER_KEYED:
+            pass
+        else:
+            v = _normalize_keys(v)
+        if key in m.VALUE_ALIASES and isinstance(v, str):
+            v = m.VALUE_ALIASES[key].get(v, v)
+        out[key] = v
+    return out
 
 
 def load_dictionary():
     d = load_yaml_blocks(REF_DIR / "data_dictionary.md")
-    d.setdefault("cot", {})
+    d["cot"] = d.get("cot") or {}
     return d
 
 
 def load_rules():
-    return load_yaml_blocks(REF_DIR / "validation_rules.md")
+    rules = load_yaml_blocks(REF_DIR / "validation_rules.md")
+    set_language(rules.get("ngon_ngu", "vi"))
+    return rules
 
 
 def active_columns(dictionary, include_computed=True):
@@ -101,7 +157,7 @@ class RunLog:
         else:
             symbol = "⚠"
         self.results.append((level, ok, message))
-        self.write(f"[{level}] {symbol} {message}")
+        self.write(f"[{label(level)}] {symbol} {message}")
         return ok
 
     def blocking_failures(self):
@@ -136,7 +192,7 @@ def git_commit():
                                capture_output=True, text=True, timeout=5)
         if out.returncode != 0:
             return None
-        return out.stdout.strip() + ("+sua_chua_commit" if dirty.stdout.strip() else "")
+        return out.stdout.strip() + ("+uncommitted" if dirty.stdout.strip() else "")
     except (OSError, subprocess.SubprocessError):
         return None
 
@@ -214,7 +270,7 @@ def parse_number(v, fmt):
     if _is_blank(v):
         return None
     if isinstance(v, bool):
-        raise ParseError(f"'{v}' không phải số")
+        raise ParseError(t("not_number", v=v))
     if isinstance(v, (int, float)):
         return float(v)
     s = str(v).strip()
@@ -229,9 +285,9 @@ def parse_number(v, fmt):
         pass
     elif re.fullmatch(plain, s):
         if re.fullmatch(rf"\d{{1,3}}{dec}\d{{3}}", s):
-            raise ParseError(f"'{v}' mơ hồ: có thể là số thập phân hoặc số có dấu hàng nghìn kiểu khác")
+            raise ParseError(t("num_ambiguous", v=v))
     else:
-        raise ParseError(f"'{v}' không đúng định dạng số đã khai báo")
+        raise ParseError(t("num_format", v=v))
     n = float(s.replace(fmt.get("hang_nghin", "."), "").replace(fmt.get("thap_phan", ","), "."))
     return -n if neg else n
 
@@ -244,7 +300,7 @@ def parse_percent(v, fmt):
         return parse_number(v.strip()[:-1], fmt) / 100
     n = parse_number(v, fmt)
     if n is not None and abs(n) > 1:
-        raise ParseError(f"'{v}' không rõ là {n:g}% hay {n * 100:g}%, cần ghi dạng 0.15 hoặc 15%")
+        raise ParseError(t("pct_ambiguous", v=v, a=f"{n:g}", b=f"{n * 100:g}"))
     return n
 
 
@@ -263,7 +319,7 @@ def parse_date(v, formats):
             return pd.Timestamp(dt.datetime.strptime(s, f))
         except ValueError:
             continue
-    raise ParseError(f"'{v}' không khớp định dạng ngày {formats}")
+    raise ParseError(t("date_format", v=v, f=formats))
 
 
 def parse_string(v):
@@ -284,7 +340,7 @@ def parse_bool(v):
     key = str(v).strip().casefold()
     if key in _BOOL:
         return _BOOL[key]
-    raise ParseError(f"'{v}' không phải có/không")
+    raise ParseError(t("not_bool", v=v))
 
 
 def parse_value(v, spec, rules):
@@ -296,7 +352,7 @@ def parse_value(v, spec, rules):
         n = parse_number(v, fmt)
         if n is not None and kind == "int":
             if not float(n).is_integer():
-                raise ParseError(f"'{v}' không phải số nguyên")
+                raise ParseError(t("not_int", v=v))
             return int(n)
         return n
     if kind == "date":

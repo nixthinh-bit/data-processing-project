@@ -9,6 +9,9 @@ do, dòng kết quả nào cũng truy ngược được về dòng Excel gốc.
 
 Bạn không cần biết code. Claude hỏi bạn về dữ liệu, rồi tự cấu hình.
 
+Dùng được bằng tiếng Việt và tiếng Anh. Claude trả lời theo ngôn ngữ bạn viết, và một dòng cấu hình
+(`language: vi` hoặc `en`) đổi ngôn ngữ của log, lý do loại dòng và tên file kết quả.
+
 ## Bắt đầu
 
 Cần có [Claude Code](https://claude.com/claude-code) và Python 3.9 trở lên.
@@ -45,7 +48,14 @@ Từ kỳ sau, bạn chỉ cần thả file mới vào `data/raw/` và nói "ch�
 | 5. Người | Vài dòng ngẫu nhiên để bạn đối chiếu tay | Bạn xác nhận |
 
 Kết quả mỗi lần chạy nằm trong một thư mục riêng ở `outputs/`, không bao giờ ghi đè lần trước. Log nằm ở
-`logs/run_log/`, do script ghi chứ không phải Claude tóm tắt.
+`logs/run_log/`, do script ghi chứ không phải Claude tóm tắt. Vài dòng trong một log thật:
+
+```
+clean:   1 dòng: arr_2025: '$5,040' mơ hồ: có thể là số thập phân hoặc số có dấu hàng nghìn kiểu khác
+[CHẶN] ✓ Số dòng: vào 103 = ra 72 + loại 31
+[CHẶN] ✗ Không trùng khoá ['ma_kh']: 2 dòng trùng, vd tai_ky_Q4.2026_2026-10-27.xlsx:34 (KH0031), ...
+[CẢNH BÁO] ⚠ Churn thì ARR 2026 bằng 0: 1 dòng sai, vd tai_ky_Q4.2026_v2_2026-10-28.xlsx:15 (3000.0)
+```
 
 ## Bộ mẫu
 
@@ -53,6 +63,8 @@ Kết quả mỗi lần chạy nằm trong một thư mục riêng ở `outputs/
 |---|---|
 | `examples/ban_hang/` | Đơn hàng bán lẻ, có vài lỗi cài sẵn. Là cấu hình mặc định khi mới clone |
 | `examples/tai_ky/` | Danh sách tái ký khách hàng, khó hơn: tiêu đề ở dòng 3, số tiền nhiều kiểu, khách trùng mã, dòng tổng cuối bảng. Có sẵn log của 5 lần chạy để xem |
+
+Mỗi bộ mẫu có cấu hình tiếng Anh (`*.md`) và tiếng Việt (`*.vi.md`).
 
 Muốn xem bộ nào thì nói với Claude, ví dụ "cho tôi chạy thử bộ tái ký".
 
@@ -65,10 +77,12 @@ cấu hình và script lên theo, dữ liệu vẫn chỉ ở trên máy.
 
 Mọi thứ riêng cho từng bộ dữ liệu nằm ở 3 file trong `.claude/skills/data-processing/`:
 `reference/data_dictionary.md` (ý nghĩa cột), `reference/validation_rules.md` (lọc, tách trùng, ngưỡng
-kiểm tra) và `scripts/transform.py` (các bước tính toán). Quy trình đầy đủ ở `SKILL.md`.
+kiểm tra) và `scripts/transform.py` (các bước tính toán). Quy trình đầy đủ ở `SKILL.md` (viết bằng tiếng
+Anh, Claude vẫn trả lời bạn bằng tiếng Việt). Tên khoá cấu hình viết tiếng Việt hay tiếng Anh đều được,
+danh sách đối chiếu ở `scripts/messages.py`.
 
 Giới hạn hiện tại: mỗi bản clone phục vụ một loại file định kỳ (có 2 loại thì clone 2 lần), phù hợp file
-tới vài chục nghìn dòng, code và tài liệu viết bằng tiếng Việt.
+tới vài chục nghìn dòng.
 
 ## Giấy phép
 

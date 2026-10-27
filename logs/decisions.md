@@ -1,11 +1,11 @@
-# Quyết định nghiệp vụ
+# Business decisions / Quyết định nghiệp vụ
 
-Ghi mỗi quyết định một mục: ngày, quyết định, lý do, ai quyết, ảnh hưởng tới lần chạy nào.
-Mục mới thêm lên trên cùng.
+One entry per decision: date, decision, reason, who decided, which run it applies from. Newest on top.
+Mỗi quyết định một mục: ngày, quyết định, lý do, ai quyết, áp dụng từ lần chạy nào. Mục mới lên trên cùng.
 
-## 2026-10-27 · Mẫu
+## 2026-10-27 · Sample
 
-- Quyết định: Dòng có thành tiền khác số lượng x đơn giá vẫn giữ, chỉ cảnh báo.
-- Lý do: Chênh lệch thường do chiết khấu tại quầy, thành tiền trong file là số khách thực trả.
-- Người quyết: (tên)
-- Áp dụng từ: 2026-10-27_run01
+- Decision: Rows where the amount differs from quantity x unit price are kept, with a warning only.
+- Reason: The difference usually comes from an in-store discount; the amount in the file is what the customer paid.
+- Decided by: (name)
+- Applies from: 2026-10-27_run01

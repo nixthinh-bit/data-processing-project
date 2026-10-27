@@ -1,53 +1,56 @@
-# Dự án xử lý dữ liệu Excel định kỳ
+# Recurring Excel data processing
 
-Dự án nhận file Excel theo kỳ, làm sạch, tính toán, kiểm tra rồi xuất kết quả. Mục tiêu là các lần chạy
-cho kết quả nhất quán, có kiểm tra và truy vết được tới từng dòng của file gốc.
+This project takes an Excel file each period, cleans it, calculates, checks and exports the result. The
+goal is consistent results across runs, with checks, and every output row traceable to its source row.
 
-Quy trình chi tiết nằm ở skill `.claude/skills/data-processing/SKILL.md`. Đọc skill đó trước khi động vào dữ liệu.
+The full procedure is the skill `.claude/skills/data-processing/SKILL.md`. Read it before touching data.
 
-Người dùng thường không viết code. Nếu chưa có thư mục `.venv`, hoặc người dùng nói muốn bắt đầu với dữ
-liệu của họ, làm theo mục 0 rồi mục B của skill và dẫn họ đi từng bước.
+Users usually do not code. If there is no `.venv` folder, or the user says they want to start with their
+own data, follow section 0 then section B of the skill and walk them through it step by step. Reply in the
+user's language (English or Vietnamese) and keep `language` in `reference/validation_rules.md` matching it.
 
-## Nguyên tắc
+## Principles
 
-1. Dữ liệu gốc trong `data/raw/` chỉ đọc. Không sửa, không ghi đè, không lưu file khác đè lên. `run.py` tự
-   đặt file gốc ở chế độ chỉ đọc và kiểm tra mã băm trước và sau khi chạy.
-2. Cách xử lý đã ổn định thì nằm trong script ở `scripts/`. Không viết lại code xử lý mỗi lần chạy, không
-   xử lý dữ liệu bằng code tạm ngoài các script này.
-3. Log kỹ thuật do script tự ghi vào `logs/run_log/`. Không tự tóm tắt hay viết thay vào log. Khi báo cáo
-   cho người dùng, trích nguyên văn các dòng `[CHẶN]` và `[CẢNH BÁO]` từ log.
-4. Không báo "xong" khi log còn dòng `[CHẶN] ✗`. Khi đó nói rõ lỗi nào, ở file và dòng nào, đề xuất cách sửa.
-5. Không đoán ý nghĩa cột. Cột lạ hoặc chưa rõ thì hỏi người dùng, rồi ghi vào
-   `reference/data_dictionary.md`. Quyết định nghiệp vụ kèm lý do ghi vào `logs/decisions.md`.
+1. Source data in `data/raw/` is read only. Never edit, overwrite or save over it. `run.py` sets source
+   files read-only and compares their checksums before and after the run.
+2. Stable processing lives in the scripts in `scripts/`. Do not rewrite processing code for each run and
+   do not process data with throwaway code outside these scripts.
+3. The scripts write the technical log in `logs/run_log/`. Never summarise or write into the log yourself.
+   When reporting, quote the BLOCK and WARN lines (`[CHẶN]`, `[CẢNH BÁO]` in Vietnamese) verbatim.
+4. Never call a run done while the log has a BLOCK `✗` line. Say which check failed, in which file and row,
+   and propose a fix.
+5. Never guess what a column means. Ask about unknown or unclear columns, then record the answer in
+   `reference/data_dictionary.md`. Record business decisions and their reasons in `logs/decisions.md`.
 
-## Bản đồ thư mục
+## Folder map
 
-| Đường dẫn | Nội dung |
+| Path | Contents |
 |---|---|
-| `data/raw/` | File gốc, tên kèm ngày nhận, ví dụ `don_hang_2026-10-01.xlsx` |
-| `data/processed/<run_id>/` | Kết quả trung gian: `01_cleaned.csv`, `01_excluded.csv`, `02_transformed.csv` |
-| `outputs/<run_id>/` | Mỗi lần chạy một thư mục, không ghi đè: `ket_qua.xlsx`, `validation_report.log`, `mau_doi_chieu.csv`, `run_meta.json` |
-| `logs/run_log/` | Log do script ghi, mỗi lần chạy một file |
-| `logs/decisions.md` | Quyết định nghiệp vụ và lý do |
-| `.claude/skills/data-processing/` | Quy trình, script, data dictionary, ngưỡng kiểm tra |
+| `data/raw/` | Source files, named with the date received, e.g. `orders_2026-10-01.xlsx` |
+| `data/processed/<run_id>/` | Intermediate files: `01_cleaned.csv`, `01_excluded.csv`, `02_transformed.csv` |
+| `outputs/<run_id>/` | One folder per run, never overwritten: result file, `validation_report.log`, review sample, `run_meta.json` |
+| `logs/run_log/` | Logs written by the scripts, one per run |
+| `logs/decisions.md` | Business decisions and why |
+| `.claude/skills/data-processing/` | Procedure, scripts, data dictionary, check thresholds |
 
-`run_id` có dạng `YYYY-MM-DD_runNN`.
+`run_id` looks like `YYYY-MM-DD_runNN`.
 
-## Lệnh thường dùng
+## Common commands
 
 ```bash
-.venv/bin/python .claude/skills/data-processing/scripts/run.py --ghi-chu "file tháng 10"
-.venv/bin/python .claude/skills/data-processing/scripts/run.py --file "tai_ky_Q1.2027_*.xlsx"
-.venv/bin/python .claude/skills/data-processing/scripts/khao_sat.py
+.venv/bin/python .claude/skills/data-processing/scripts/run.py --note "October file"
+.venv/bin/python .claude/skills/data-processing/scripts/run.py --file "orders_2026-10-*.xlsx"
+.venv/bin/python .claude/skills/data-processing/scripts/profile_data.py
 ```
 
-Mã thoát của `run.py`: 0 là qua mọi kiểm tra CHẶN, 1 là còn lỗi CHẶN (không xuất kết quả).
+`--ghi-chu` works the same as `--note`. Exit code of `run.py`: 0 means every BLOCK check passed, 1 means
+a BLOCK check failed (no result exported).
 
-## Bối cảnh riêng
+## Project context
 
-Phần này để mỗi người tự điền khi dùng cho dữ liệu của mình: dữ liệu đến từ đâu, ai gửi, chu kỳ nhận,
-ai dùng kết quả, có kỳ hạn gì.
+Each user fills this in for their own data: where it comes from, who sends it, how often, who uses the
+result, any deadlines.
 
-- Nguồn dữ liệu: (chưa điền)
-- Chu kỳ: (chưa điền)
-- Người dùng kết quả: (chưa điền)
+- Data source: (not filled in)
+- Frequency: (not filled in)
+- Result used by: (not filled in)

@@ -1,4 +1,4 @@
-"""Bước 2: tính toán, ghép bảng, tạo cột mới.
+"""Bước 2: tính toán, ghép bảng, tạo cột mới.  /  Step 2: calculations, joins, new columns.
 
 Đây là phần riêng của từng người. Mỗi bước nghiệp vụ là một hàm nhận DataFrame và trả về
 DataFrame, rồi khai báo trong BUOC theo đúng thứ tự chạy. Quy ước:
@@ -51,6 +51,7 @@ BUOC = [
 # ---------- khung chạy, thường không cần sửa ----------
 
 def transform(run_id, log):
+    c.load_rules()  # đặt ngôn ngữ
     dictionary = c.load_dictionary()
     columns = c.active_columns(dictionary)
     df = c.read_csv(c.run_dir(run_id) / "01_cleaned.csv", columns)
@@ -59,12 +60,12 @@ def transform(run_id, log):
         before = set(df.columns)
         df = step(df)
         added = [col for col in df.columns if col not in before]
-        log.write(f"transform: {step.__name__}" + (f" thêm cột {added}" if added else ""))
+        log.write(f"transform: {step.__name__}" + (c.t("tf_step_added", a=added) if added else ""))
     undeclared = [col for col in df.columns if col not in dictionary["cot"] and col not in c.TRACE_COLS]
     if undeclared:
-        log.write(f"transform: cột mới chưa khai báo trong data_dictionary: {undeclared}")
+        log.write(c.t("tf_undeclared", a=undeclared))
     c.save_csv(df, c.run_dir(run_id) / "02_transformed.csv")
-    log.write(f"transform: {n_in} dòng vào, {len(df)} dòng ra")
+    log.write(c.t("tf_summary", n=n_in, m=len(df)))
     return df
 
 

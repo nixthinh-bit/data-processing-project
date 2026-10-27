@@ -1,4 +1,4 @@
-"""Bước 1: chuẩn hoá định dạng, bỏ dòng lỗi.
+"""Bước 1: chuẩn hoá định dạng, bỏ dòng lỗi.  /  Step 1: normalise formats, drop bad rows.
 
 Đọc mọi file trong data/raw (chỉ đọc), đổi tên cột về tên chuẩn theo data_dictionary,
 ép kiểu từng ô, tách dòng lỗi ra file riêng kèm lý do. Không đoán: cột lạ hoặc cột còn
@@ -31,11 +31,11 @@ def clean(run_id, log):
 
     unclear = [k for k, v in dictionary["cot"].items() if (v or {}).get("trang_thai") == "chua_ro" and not (v or {}).get("bo_qua")]
     if unclear:
-        raise StopRun(f"Cột chưa rõ nghĩa trong data_dictionary: {', '.join(unclear)}. Hỏi người dùng rồi cập nhật trước khi chạy.")
+        raise StopRun(c.t("stop_unclear", cols=", ".join(unclear)))
 
     files = c.raw_files(rules)
     if not files:
-        raise StopRun(f"Không có file nào trong {c.RAW_DIR} khớp mẫu tên file.")
+        raise StopRun(c.t("stop_no_files", d=c.RAW_DIR))
 
     columns = c.active_columns(dictionary, include_computed=False)
     kept, excluded, mapped = [], [], set()
@@ -43,18 +43,18 @@ def clean(run_id, log):
         raw = c.read_raw_file(path, rules)
         mapping, unknown, skipped = c.column_map(raw.columns, dictionary)
         if unknown:
-            raise StopRun(f"{path.name}: có cột chưa có trong data_dictionary: {unknown}. Không đoán nghĩa, hỏi người dùng.")
+            raise StopRun(c.t("stop_unknown_cols", f=path.name, cols=unknown))
         mapped.update(mapping.values())
         missing = [k for k in columns if k not in mapping.values()]
-        log.write(f"clean: {path.name} có {len(raw)} dòng, {len(mapping)} cột khớp"
-                  + (f", bỏ qua {skipped}" if skipped else "")
-                  + (f", THIẾU {missing}" if missing else ""))
+        log.write(c.t("clean_file", f=path.name, n=len(raw), m=len(mapping))
+                  + (c.t("clean_skipped", x=skipped) if skipped else "")
+                  + (c.t("clean_missing", x=missing) if missing else ""))
 
         for _, row in raw.iterrows():
             values = row.drop(labels=c.TRACE_COLS)
             trace = {c.SOURCE_FILE: row[c.SOURCE_FILE], c.SOURCE_ROW: int(row[c.SOURCE_ROW])}
             if all(c._is_blank(v) for v in values):
-                excluded.append({**trace, "ly_do_loai": "dòng trống", **_raw_values(row, mapping)})
+                excluded.append({**trace, c.REASON: c.t("r_blank"), **_raw_values(row, mapping)})
                 continue
             out, reasons = dict(trace), []
             for src, std in mapping.items():
@@ -63,19 +63,19 @@ def clean(run_id, log):
                     val = c.parse_value(row[src], spec, rules)
                 except c.ParseError as e:
                     if on_type_error == "de_trong" and not spec.get("bat_buoc"):
-                        log.write(f"clean: {path.name} dòng {trace[c.SOURCE_ROW]} cột {std}: {e}, để trống theo quy tắc")
+                        log.write(c.t("type_blank_log", f=path.name, r=trace[c.SOURCE_ROW], col=std, e=e))
                         val = None
                     else:
                         reasons.append(f"{std}: {e}")
                         continue
                 if val is None and spec.get("bat_buoc"):
-                    reasons.append(f"{std}: bắt buộc nhưng trống")
+                    reasons.append(c.t("r_required", col=std))
                 out[std] = val
             outside = _drop_reason(out, drop_when) or _filter_reason(out, row_filter)
             if outside:
-                excluded.append({**trace, "ly_do_loai": outside, **_raw_values(row, mapping)})
+                excluded.append({**trace, c.REASON: outside, **_raw_values(row, mapping)})
             elif reasons:
-                excluded.append({**trace, "ly_do_loai": "; ".join(reasons), **_raw_values(row, mapping)})
+                excluded.append({**trace, c.REASON: "; ".join(reasons), **_raw_values(row, mapping)})
             else:
                 kept.append(out)
 
@@ -85,19 +85,19 @@ def clean(run_id, log):
         dup = cleaned.duplicated(subset=value_cols, keep="first")
         for _, r in cleaned[dup].iterrows():
             excluded.append({c.SOURCE_FILE: r[c.SOURCE_FILE], c.SOURCE_ROW: r[c.SOURCE_ROW],
-                             "ly_do_loai": "trùng hoàn toàn với một dòng trước", **{k: r[k] for k in value_cols}})
+                             c.REASON: c.t("r_exact_dup"), **{k: r[k] for k in value_cols}})
         cleaned = cleaned[~dup]
     if dedupe_by_key and len(cleaned):
         cleaned = _dedupe_by_key(cleaned, columns, excluded, log)
 
-    excluded_df = pd.DataFrame(excluded) if excluded else pd.DataFrame(columns=c.TRACE_COLS + ["ly_do_loai"])
+    excluded_df = pd.DataFrame(excluded) if excluded else pd.DataFrame(columns=c.TRACE_COLS + [c.REASON])
     out_dir = c.run_dir(run_id)
     c.save_csv(cleaned, out_dir / "01_cleaned.csv")
     c.save_csv(excluded_df, out_dir / "01_excluded.csv")
-    log.write(f"clean: giữ {len(cleaned)} dòng, loại {len(excluded_df)} dòng (lý do ở 01_excluded.csv)")
+    log.write(c.t("clean_summary", k=len(cleaned), x=len(excluded_df)))
     if len(excluded_df):
-        for reason, n in excluded_df["ly_do_loai"].value_counts().head(10).items():
-            log.write(f"clean:   {n} dòng: {reason}")
+        for reason, n in excluded_df[c.REASON].value_counts().head(10).items():
+            log.write(c.t("clean_reason_line", n=n, r=reason))
     return cleaned, excluded_df
 
 
@@ -116,7 +116,7 @@ def _filter_reason(out, row_filter):
     for col, allowed in row_filter.items():
         allowed = allowed if isinstance(allowed, list) else [allowed]
         if out.get(col) not in allowed:
-            return f"{col} ngoài phạm vi lọc {allowed}"
+            return c.t("r_outside", col=col, a=allowed)
     return None
 
 
@@ -125,7 +125,7 @@ def _dedupe_by_key(cleaned, columns, excluded, log):
     Trùng khoá mà khác nội dung thì không tự chọn, giữ nguyên để tầng 1 chặn và hỏi người dùng."""
     keys = [k for k, v in columns.items() if (v or {}).get("khoa") and k in cleaned.columns]
     if not keys:
-        log.write("clean: bo_trung_theo_khoa bật nhưng chưa khai báo cột khoá, bỏ qua")
+        log.write(c.t("dedupe_nokey"))
         return cleaned
     value_cols = [k for k in cleaned.columns if k not in c.TRACE_COLS]
     dup = cleaned[cleaned.duplicated(subset=keys, keep=False)]
@@ -138,11 +138,11 @@ def _dedupe_by_key(cleaned, columns, excluded, log):
         ref = f"{first[c.SOURCE_FILE]}:{first[c.SOURCE_ROW]}"
         for idx, r in grp.iloc[1:].iterrows():
             excluded.append({c.SOURCE_FILE: r[c.SOURCE_FILE], c.SOURCE_ROW: r[c.SOURCE_ROW],
-                             "ly_do_loai": f"trùng {'+'.join(keys)}, giống hệt dòng được giữ",
-                             "trung_voi_dong": ref, **{k: r[k] for k in value_cols}})
+                             c.REASON: c.t("r_key_dup", k="+".join(keys)),
+                             c.DUP_OF: ref, **{k: r[k] for k in value_cols}})
             drop.append(idx)
-    log.write(f"clean: tách trùng theo {keys}: {dup.groupby(keys, dropna=False).ngroups} nhóm trùng, loại {len(drop)} dòng"
-              + (f"; {conflicts} nhóm trùng nhưng khác nội dung, giữ nguyên để tầng 1 chặn" if conflicts else ""))
+    log.write(c.t("dedupe_summary", k=keys, g=dup.groupby(keys, dropna=False).ngroups, n=len(drop))
+              + (c.t("dedupe_conflicts", n=conflicts) if conflicts else ""))
     return cleaned.drop(index=drop)
 
 
@@ -160,7 +160,7 @@ def main():
     try:
         clean(run_id, log)
     except StopRun as e:
-        log.write(f"[{c.CHAN}] ✗ {e}")
+        log.write(f"[{c.label(c.CHAN)}] ✗ {e}")
         sys.exit(2)
 
 

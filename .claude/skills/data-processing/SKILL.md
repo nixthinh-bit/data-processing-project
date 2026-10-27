@@ -1,137 +1,146 @@
 ---
 name: data-processing
-description: Xử lý file Excel định kỳ trong data/raw theo luồng cố định clean -> transform -> validate, kiểm tra 4 tầng tự động (cấu trúc, đối soát, nghiệp vụ, biến động) và chuẩn bị mẫu đối chiếu tay, xuất kết quả theo từng lần chạy có log. Dẫn người dùng không biết code đi từng bước khi thiết lập cho bộ dữ liệu mới. Dùng khi người dùng mới clone dự án, muốn bắt đầu với dữ liệu của họ, nhận file dữ liệu mới, muốn chạy lại kỳ xử lý, hỏi về kết quả hay lỗi của một lần chạy, hoặc muốn thêm cột, quy tắc, bước tính toán mới.
+description: Process a recurring Excel file in data/raw through a fixed clean -> transform -> validate flow, with 4 automatic check layers (structure, reconciliation, business rules, drift) plus a manual review sample, exporting each run to its own folder with a log. Walks non-coders step by step through setting it up for their own data. Use when the user has just cloned the project, wants to start with their own data, received a new data file, wants to rerun a period, asks about a run's result or errors, or wants to add a column, rule or calculation. Also for Vietnamese requests such as "xử lý dữ liệu", "chạy kỳ mới", "bắt đầu với dữ liệu của tôi".
 ---
 
-# Xử lý dữ liệu Excel định kỳ
+# Recurring Excel processing
 
-Đọc `CLAUDE.md` ở gốc dự án để nắm 5 nguyên tắc. Skill này mô tả thứ tự làm và quy tắc nghiệp vụ.
+Read `CLAUDE.md` at the project root for the 5 principles. This skill gives the order of work and the
+business rules.
 
-Người dùng skill này thường không viết code. Họ hiểu dữ liệu của mình, còn bạn lo phần kỹ thuật. Vì vậy:
+The people using this skill usually do not code. They know their data; you handle the technical side:
 
-- Nói bằng ngôn ngữ nghiệp vụ. Hỏi "mỗi khách chỉ được có một dòng đúng không?", đừng hỏi "cột nào là khoá".
-- Không bắt người dùng tự sửa file cấu hình hay code. Bạn sửa, rồi nói ngắn gọn đã đổi gì.
-- Ở mục B, mở đầu mỗi bước bằng một dòng "Bước x/6: ..." để người dùng biết đang ở đâu và còn bao nhiêu.
-- Mỗi lần hỏi, gom câu hỏi lại trong một lượt, có đề xuất sẵn để người dùng chỉ cần gật hoặc sửa.
+- Talk in business terms. Ask "should each customer appear only once?", not "which column is the key?".
+- Do not ask the user to edit config files or code. You edit them, then say briefly what changed.
+- In section B, open each step with a line "Step x/6: ..." so the user knows where they are.
+- When you ask, batch the questions in one turn, with a proposed answer the user can accept or correct.
+- Reply in the user's language. Keep `language` in `reference/validation_rules.md` set to that language
+  (`en` or `vi`), so the log and output file names match what the user reads.
 
-Script nằm ở `scripts/`, chạy bằng `.venv/bin/python` từ gốc dự án:
+Scripts are in `scripts/`, run with `.venv/bin/python` from the project root:
 
-| Script | Việc |
+| Script | Job |
 |---|---|
-| `run.py` | Chạy trọn một lần, tạo `run_id`, ghi log, xuất kết quả. Đây là lệnh dùng hằng ngày |
-| `khao_sat.py` | Khảo sát file gốc và đề xuất data_dictionary (khi bắt đầu, hoặc khi file gốc đổi cấu trúc) |
-| `clean.py` | Đổi tên cột theo data_dictionary, ép kiểu, lọc, tách trùng, tách dòng lỗi kèm lý do |
-| `transform.py` | Các bước nghiệp vụ trong danh sách `BUOC` |
-| `validate.py` | Kiểm tra 4 tầng và lấy mẫu cho tầng 5 |
-| `common.py` | Hàm dùng chung, thường không cần sửa |
+| `run.py` | Run everything once, create a `run_id`, write the log, export the result. The everyday command |
+| `profile_data.py` | Profile source files and propose a data_dictionary (at the start, or when the source layout changes) |
+| `clean.py` | Rename columns per data_dictionary, parse types, filter, dedupe, exclude bad rows with a reason |
+| `transform.py` | Business steps listed in `BUOC` |
+| `validate.py` | The 4 check layers and the layer 5 sample |
+| `common.py`, `messages.py` | Shared helpers, and every message in both languages. Rarely edited |
 
-Cấu hình đọc từ khối yaml trong `reference/data_dictionary.md` và `reference/validation_rules.md`.
-Bộ mẫu có sẵn trong `examples/`: `ban_hang` (đang là mặc định), `tai_ky`.
+Configuration is read from the yaml blocks in `reference/data_dictionary.md` and
+`reference/validation_rules.md`. Keys can be English (`columns`, `required`, `keep_only`...) or Vietnamese
+(`cot`, `bat_buoc`, `loc_dong`...); the full alias list is `KEY_ALIASES` in `messages.py`.
+Samples in `examples/`: `ban_hang` (retail orders, the default) and `tai_ky` (customer renewals). Each has
+an English config (`*.md`) and a Vietnamese one (`*.vi.md`).
 
-## 0. Thiết lập lần đầu
+Output names follow `language`: `result.xlsx` / `ket_qua.xlsx`, `review_sample.csv` / `mau_doi_chieu.csv`,
+trace columns `_source_file`, `_source_row` / `_file_goc`, `_dong_goc`.
 
-Làm khi chưa có thư mục `.venv`, trước mọi mục khác.
+## 0. First-time setup
 
-1. Kiểm tra có `python3` (3.9 trở lên). Không có thì hướng dẫn người dùng cài, đừng tự cài hệ thống.
-2. Tạo môi trường: dùng `uv venv .venv && uv pip install -p .venv -r requirements.txt` nếu có `uv`,
-   không thì `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
-3. Chạy thử bộ mẫu bán hàng (chép `examples/ban_hang/don_hang_2026-10-01.xlsx` vào `data/raw/`, chạy
-   `run.py --ghi-chu "chạy thử bộ mẫu"`). Cho người dùng xem log và giải thích ngắn 4 tầng kiểm tra qua
-   chính log đó. Sau đó xoá file mẫu khỏi `data/raw/` (nhớ bỏ chế độ chỉ đọc trước) để chuẩn bị cho dữ liệu thật.
+Do this when there is no `.venv` folder, before anything else.
 
-## A. Chạy một kỳ dữ liệu mới
+1. Check that `python3` (3.9 or later) exists. If not, tell the user how to install it; do not install system software yourself.
+2. Create the environment: `uv venv .venv && uv pip install -p .venv -r requirements.txt` if `uv` exists,
+   otherwise `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+3. Pick the language from how the user writes. For Vietnamese, copy `examples/ban_hang/*.vi.md` over the two
+   files in `reference/` (dropping `.vi`); for English the defaults are already English.
+4. Run the retail sample: copy `examples/ban_hang/don_hang_2026-10-01.xlsx` into `data/raw/` and run
+   `run.py --note "sample run"`. Show the user the log and explain the 4 layers through that log. Then
+   remove the sample from `data/raw/` (make it writable first) to make room for real data.
 
-1. Kiểm tra file mới đã nằm trong `data/raw/` với tên kèm ngày nhận. Nếu người dùng đưa file ở chỗ khác,
-   chép vào (không di chuyển, không đổi nội dung). Không xoá file kỳ trước nếu người dùng không yêu cầu.
-2. Chạy `run.py --ghi-chu "<nguồn file, kỳ nào>"`. Nếu `data/raw` có file của nhiều kỳ, thêm
-   `--file "<mẫu tên file của kỳ này>"` để chỉ đọc đúng kỳ, các file kỳ trước để nguyên.
-3. Đọc file log `logs/run_log/<run_id>.log` mà script in ra. Báo cáo cho người dùng bằng cách trích
-   nguyên văn các dòng `[CHẶN]`, `[CẢNH BÁO]`, `[THỦ CÔNG]` và dòng kết luận. Không diễn giải lại số liệu.
-4. Còn `[CHẶN] ✗`: nói là chưa xong. Chỉ ra file và dòng gốc liên quan (log đã có dạng `file.xlsx:dòng`),
-   đề xuất cách sửa (bổ sung data_dictionary, thêm quy tắc, sửa bước transform). Sửa xong thì chạy lại,
-   lần chạy mới sẽ có `run_id` mới.
-5. Có `[CẢNH BÁO] ⚠`: liệt kê, hỏi người dùng cái nào chấp nhận được. Quyết định chấp nhận ghi vào
-   `logs/decisions.md`.
-6. Nhắc người dùng làm tầng 5: mở `outputs/<run_id>/mau_doi_chieu.csv`, so từng dòng với file gốc theo
-   `_file_goc` và `_dong_goc`, điền cột `khop_file_goc`. Chỉ coi kỳ này hoàn tất khi người dùng xác nhận.
+## A. Run a new period
 
-## B. Bắt đầu với bộ dữ liệu của người dùng
+1. Check the new file is in `data/raw/` with the received date in its name. If the user gives a file
+   elsewhere, copy it in (do not move it or change it). Do not delete earlier files unless asked.
+2. Run `run.py --note "<where the file came from, which period>"`. If `data/raw` holds several periods,
+   add `--file "<pattern for this period>"` so only this period is read; leave older files in place.
+3. Read `logs/run_log/<run_id>.log`, which the script prints. Report by quoting the BLOCK / WARN / MANUAL
+   lines (`[CHẶN]`, `[CẢNH BÁO]`, `[THỦ CÔNG]` in Vietnamese) and the conclusion verbatim. Do not restate the numbers.
+4. Any `✗` at BLOCK level: say it is not done. Point to the source file and row (the log gives `file.xlsx:row`),
+   propose a fix (data_dictionary, a rule, a transform step). After fixing, run again; the new run gets a new `run_id`.
+5. Any `⚠` warning: list them and ask which are acceptable. Record accepted ones in `logs/decisions.md`.
+6. Remind the user about layer 5: open the review sample in `outputs/<run_id>/`, compare each row with the
+   source by the trace columns, fill in the match column. The period is complete only when the user confirms.
 
-Làm đúng thứ tự, mỗi bước chờ người dùng xác nhận rồi mới sang bước sau. Nếu chưa có `.venv`, làm mục 0 trước.
+## B. Start with the user's own data
 
-**Bước 1/6: Nhận file.** Xin người dùng một file thật của một kỳ. Chép vào `data/raw/` với tên kèm ngày
-nhận (ví dụ `doanh_thu_2026-10-27.xlsx`). Hỏi luôn file đến từ đâu, bao lâu nhận một lần, ai dùng kết quả,
-rồi điền vào mục "Bối cảnh riêng" trong `CLAUDE.md`.
+Follow this order and wait for the user's confirmation before each next step. Do section 0 first if there is no `.venv`.
 
-**Bước 2/6: Hiểu từng cột.** Chạy `khao_sat.py`, đọc `data/processed/_khao_sat/de_xuat_data_dictionary.md`.
-Trình bày cho người dùng một bảng: tên cột, bạn hiểu cột đó là gì, ví dụ giá trị. Hỏi những gì chưa chắc
-bằng lời nghiệp vụ:
-- Mỗi dòng là một cái gì (một đơn, một khách, một giao dịch)? Cái gì không được lặp?
-- Cột nào bắt buộc phải có, thiếu thì bỏ dòng đó?
-- Cột tiền nào cần khớp tổng giữa file gốc và kết quả? Đơn vị gì?
-- Giá trị thế nào là bất thường (âm, quá lớn, ngày ở tương lai, giá trị lạ)?
-- Cột nào không cần dùng?
+**Step 1/6: Get the file.** Ask for one real file from one period. Copy it into `data/raw/` with the received
+date in the name (e.g. `revenue_2026-10-27.xlsx`). Ask where it comes from, how often it arrives and who uses
+the result, and fill in the "Project context" section of `CLAUDE.md`.
 
-Ghi câu trả lời vào khối yaml của `reference/data_dictionary.md`. Cột nào người dùng chưa trả lời thì để
-`trang_thai: chua_ro`, script sẽ chặn cho tới khi có câu trả lời. Ghi chú `sheet`, dòng tiêu đề, định dạng
-số và ngày vào `reference/validation_rules.md` (mục `nguon`, `dinh_dang_so`, `dinh_dang_ngay`).
+**Step 2/6: Understand each column.** Run `profile_data.py` and read `data/processed/_profile/proposed_data_dictionary.md`.
+Show the user a table: column name, what you think it is, sample values. Ask what is unclear in business terms:
+- What is one row (an order, a customer, a transaction)? What must not repeat?
+- Which columns must be filled, so a blank drops the row?
+- Which amount columns must add up between the source and the result? In what unit?
+- What counts as abnormal (negative, too large, future dates, unexpected values)?
+- Which columns are not needed?
 
-**Bước 3/6: Hỏi cần làm gì với dữ liệu.** Hỏi người dùng muốn kết quả cuối trông thế nào. Xếp yêu cầu vào
-đúng chỗ, nói lại cho người dùng duyệt trước khi làm:
+Write the answers into the yaml block of `reference/data_dictionary.md`. Columns the user has not answered
+stay `status: unclear`; the scripts block until they are answered. Record sheet, header row, number and date
+formats in `reference/validation_rules.md` (`source`, `number_format`, `date_formats`).
 
-| Yêu cầu kiểu | Làm ở đâu |
+**Step 3/6: Ask what to do with the data.** Ask what the final result should look like. Put each request in
+the right place and read it back for approval before doing it:
+
+| Request | Where |
 |---|---|
-| Chỉ giữ một phần (một vùng, một trạng thái) | `lam_sach.loc_dong` trong validation_rules |
-| Bỏ dòng trùng | `khoa: true` trong data_dictionary + `lam_sach.bo_trung_theo_khoa` |
-| Bỏ dòng không phải dữ liệu (dòng tổng, dòng ghi chú) | `lam_sach.loai_dong_khi` |
-| Gộp cách viết khác nhau ("Việt Nam", "VN") | `anh_xa` của cột trong data_dictionary |
-| Tính cột mới, xếp thứ tự, ghép bảng tra cứu | một hàm trong `BUOC` của `transform.py`, cột mới khai báo `nguon: tinh_toan` |
+| Keep only part of the data (a region, a status) | `cleaning.keep_only` in validation_rules |
+| Remove duplicates | `key: true` in data_dictionary + `cleaning.dedupe_by_key` |
+| Drop rows that are not data (totals, notes) | `cleaning.drop_rows_when` |
+| Merge spellings ("Viet Nam", "VN") | the column's `map` in data_dictionary |
+| New columns, sorting, lookup joins | a function in `BUOC` in `transform.py`; declare new columns with `source: computed` |
 
-Nhớ: mọi việc loại dòng làm ở clean (qua cấu hình), không làm trong transform.
+Remember: every row removal happens in clean (through config), never in transform.
 
-**Bước 4/6: Chạy thử lần đầu.** Chạy `run.py`. Mục tiêu đầu tiên là tầng 1 và 2 qua hết. Đọc log, giải
-thích từng dòng `✗` bằng lời thường và sửa cấu hình cho tới khi qua. Cho người dùng xem số dòng vào, ra,
-bị loại và lý do loại chính (từ log), rồi mở vài dòng của `ket_qua.xlsx`.
+**Step 4/6: First run.** Run `run.py`. The first goal is layers 1 and 2 passing. Read the log, explain each
+`✗` in plain words and fix the config until they pass. Show rows in, out and excluded with the main reasons
+(from the log), then open a few rows of the result file.
 
-**Bước 5/6: Người dùng kiểm và chốt.** Đưa người dùng `mau_doi_chieu.csv` để đối chiếu tay. Hỏi kết quả
-có đúng ý không. Sửa và chạy lại tới khi người dùng nói đúng. Mỗi quyết định (cách xử lý trùng, lọc gì, vì
-sao giữ dòng có cảnh báo) ghi một mục vào `logs/decisions.md`.
+**Step 5/6: The user checks and confirms.** Give the user the review sample. Ask whether the result is what
+they wanted. Fix and rerun until they say it is right. Record every decision (how duplicates are handled,
+what is filtered, why rows with warnings are kept) as an entry in `logs/decisions.md`.
 
-**Bước 6/6: Chốt quy tắc kiểm tra và hướng dẫn kỳ sau.** Đề xuất ngưỡng tầng 3 (khoảng hợp lệ, quy tắc
-chéo cột `dieu_kien`) và tầng 4 (lệch bao nhiêu % so với kỳ trước thì cảnh báo) dựa trên dữ liệu vừa chạy,
-người dùng duyệt rồi ghi vào. Kết thúc bằng hướng dẫn ngắn cho các kỳ sau: thả file mới vào `data/raw/`
-và nói "chạy kỳ mới", phần còn lại làm theo mục A.
+**Step 6/6: Lock the check rules and explain later periods.** Propose layer 3 thresholds (ranges,
+cross-column `conditions`) and layer 4 thresholds (how much change vs the previous period triggers a warning)
+based on the data just run; write them after the user approves. Finish with a short how-to for later periods:
+drop the new file into `data/raw/` and say "run the new period"; the rest follows section A.
 
-## C. Khi gặp lỗi dữ liệu mới
+## C. When a new data problem appears
 
-Một lỗi mới (người dùng phát hiện ở tầng 5, hoặc thấy kết quả lạ) phải biến thành một quy tắc để lần sau
-script tự bắt:
+A new problem (found in layer 5, or a result that looks wrong) must become a rule so the scripts catch it next time:
 
-1. Thêm quy tắc vào `validation_rules.md` hoặc vào cột tương ứng trong `data_dictionary.md`.
-   Các loại đã có sẵn: min, max, gia_tri_hop_le, anh_xa, thu_tu_ngay, dieu_kien (chéo cột),
-   loai_dong_khi (dòng không phải dữ liệu như dòng tổng), loc_dong, bo_trung_theo_khoa.
-2. Ghi một dòng vào bảng "Lịch sử quy tắc" cuối `validation_rules.md`.
-3. Nếu loại kiểm tra chưa có trong `validate.py`, thêm một khối check mới vào hàm của tầng phù hợp,
-   dùng `log.check(c.CHAN hoặc c.CANH_BAO, dat, thong_diep)`, đọc ngưỡng từ rules chứ không viết cứng.
-4. Chạy lại để xác nhận quy tắc mới bắt được lỗi.
+1. Add a rule to `validation_rules.md` or to the column in `data_dictionary.md`. Available rule types:
+   min, max, allowed_values, map, date_order, conditions (cross-column), drop_rows_when (non-data rows such
+   as totals), keep_only, dedupe_by_key.
+2. Add a line to the "Rule history" table at the end of `validation_rules.md`.
+3. If the kind of check does not exist in `validate.py` yet, add a check to the matching layer function with
+   `log.check(c.CHAN or c.CANH_BAO, passed, message)`. Read thresholds from the rules, never hard-code them.
+   Add any new message text to `messages.py` in both languages.
+4. Run again to confirm the new rule catches the problem.
 
-## D. Dùng một bộ mẫu trong examples/
+## D. Use a sample from examples/
 
-Khi người dùng muốn xem thử một bộ mẫu (ví dụ "cho tôi xem bộ tái ký"): chép `data_dictionary.md`,
-`validation_rules.md` của bộ đó vào `reference/`, `transform.py` của bộ đó đè lên `scripts/transform.py`,
-chép file Excel của bộ đó vào `data/raw/`, rồi chạy như mục A. Trước khi chép, nếu `reference/` đang chứa
-cấu hình dữ liệu thật của người dùng thì hỏi trước, vì sẽ bị ghi đè.
+When the user wants to try a sample (e.g. "run the renewal sample"): copy that sample's `data_dictionary.md`
+and `validation_rules.md` (or the `.vi.md` versions, renamed) into `reference/`, its `transform.py` over
+`scripts/transform.py`, its Excel files into `data/raw/`, then run as in section A. If `reference/` holds the
+user's own configuration, ask first, because it will be overwritten.
 
-## Quy tắc nghiệp vụ
+## Business rules
 
-- Không xoá dòng trong `transform.py`. Dòng cần loại phải đi qua `clean.py` để có lý do trong
-  `01_excluded.csv`, nếu không tầng 2 sẽ chặn vì số dòng không khớp.
-- Không sửa giá trị gốc cho "đẹp". Giá trị sai thì để tầng 3 cảnh báo và hỏi người dùng.
-- Cột `_file_goc`, `_dong_goc` phải đi theo mọi bước để truy vết. Không bỏ hai cột này trong transform.
-- Đổi cách tính so với kỳ trước thì ghi vào `logs/decisions.md` trước khi chạy, vì tầng 4 sẽ báo lệch.
-- Không sửa thư mục `outputs/` của lần chạy cũ. Muốn kết quả khác thì chạy lần mới.
-- Tầng 4 so với lần chạy đạt gần nhất có cùng bộ cột (nên lần chạy bộ mẫu không bị đem ra so với dữ liệu
-  thật), theo thứ tự run_id chứ không theo kỳ dữ liệu. Chạy lại một kỳ cũ sau
-  kỳ mới thì cảnh báo biến động của lần đó không có ý nghĩa, ghi rõ khi báo cáo.
+- Never delete rows in `transform.py`. Rows to drop go through `clean.py` so they get a reason in
+  `01_excluded.csv`; otherwise layer 2 blocks because the row counts do not match.
+- Never "tidy up" source values. Wrong values get a layer 3 warning and a question to the user.
+- The trace columns must survive every step. Never drop them in transform.
+- If a calculation changes from the previous period, record it in `logs/decisions.md` before running,
+  because layer 4 will flag the change.
+- Never edit an earlier run's `outputs/` folder. For a different result, run again.
+- Layer 4 compares with the latest passing run that has the same columns (so a sample run is never compared
+  with real data), in `run_id` order rather than data period order. Rerunning an old period after a newer one
+  makes that run's drift warning meaningless; say so when reporting.
 
-(Phần dưới để bổ sung quy tắc riêng của từng bộ dữ liệu.)
+(Add dataset-specific rules below.)

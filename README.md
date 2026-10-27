@@ -9,6 +9,9 @@ has a reason, and every output row traces back to its original Excel row.
 
 You do not need to code. Claude asks you about your data and does the configuration.
 
+Works in English and Vietnamese. Claude replies in the language you write in, and one setting
+(`language: en` or `vi`) switches the log, exclusion reasons and output file names.
+
 ## Getting started
 
 You need [Claude Code](https://claude.com/claude-code) and Python 3.9 or later.
@@ -46,14 +49,24 @@ After that, drop each new file into `data/raw/` and say "run the new period".
 | 5. Human | A few random rows for you to compare by hand | You confirm |
 
 Each run gets its own folder in `outputs/` and never overwrites an earlier one. Logs in `logs/run_log/`
-are written by the scripts, not summarised by Claude.
+are written by the scripts, not summarised by Claude. A few lines from a real log:
+
+```
+clean:   1 row(s): arr_2025: '$5,040' is ambiguous: it could be a decimal or a number with a different thousands separator
+[BLOCK] ✓ Rows: in 103 = out 72 + excluded 31
+[BLOCK] ✗ No duplicate keys ['ma_kh']: 2 duplicate row(s), e.g. tai_ky_Q4.2026_2026-10-27.xlsx:34 (KH0031), ...
+[WARN] ⚠ Churn means ARR 2026 is 0: 1 row(s) fail, e.g. tai_ky_Q4.2026_v2_2026-10-28.xlsx:15 (3000.0)
+```
 
 ## Samples
 
 | Folder | What it is |
 |---|---|
 | `examples/ban_hang/` | Retail orders with a few planted errors. The default configuration after cloning |
-| `examples/tai_ky/` | Customer renewal list, harder: header on row 3, mixed number formats, duplicate IDs, a totals row. Includes logs from 5 runs |
+| `examples/tai_ky/` | Customer renewal list, harder: header on row 3, mixed number formats, duplicate IDs, a totals row. Includes logs from 5 runs (in Vietnamese) |
+
+Each sample has an English configuration (`*.md`) and a Vietnamese one (`*.vi.md`). The sample data
+itself has Vietnamese headers and values.
 
 To try one, ask Claude, for example "run the renewal sample for me".
 
@@ -67,9 +80,10 @@ configuration and scripts go with it.
 Everything specific to a dataset lives in 3 files under `.claude/skills/data-processing/`:
 `reference/data_dictionary.md` (column meanings), `reference/validation_rules.md` (filters, dedupe,
 thresholds) and `scripts/transform.py` (calculation steps). The full procedure is in `SKILL.md`.
+Config keys can be written in English or Vietnamese; the alias list is in `scripts/messages.py`.
 
-Current limits: one clone serves one kind of recurring file (clone twice for two), suited to files up to a
-few tens of thousands of rows, and code and docs are in Vietnamese.
+Current limits: one clone serves one kind of recurring file (clone twice for two), and it suits files up to
+a few tens of thousands of rows. Code comments are mostly in Vietnamese.
 
 ## License
 
